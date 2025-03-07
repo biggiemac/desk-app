@@ -1,0 +1,82 @@
+2.0 Pro Experimental. Lacks access to real-time info and some Gemini features.
+# General
+.env
+.env.backup
+.env.example
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+Vagrantfile
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+/storage/debugbar
+
+# Laravel
+/vendor/
+/node_modules/
+/public/storage
+/public/hot
+/storage/*.key
+/storage/app/public
+/storage/logs/*
+!/storage/logs/.gitignore
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+/storage/framework/cache/*
+!/storage/framework/cache/.gitignore
+/storage/framework/testing/*
+!/storage/framework/testing/.gitignore
+.php-cs-fixer.cache
+.php-cs-fixer.php.cache
+*.phar
+*.sqlite3
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+Thumbs.db
+.DS_Store
+
+# Build and compiled files
+*.js.map
+*.css.map
+
+# OS generated files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Telescope
+/storage/app/telescope/*
+!/storage/app/telescope/.gitignore
+
+
+# Editor specific temporary files:
+*.bak
+*.swp
+*~
+*.orig
+*.rej
+
+#  Other Laravel files and directories (explaination below)
+/.phpunit.cache/
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+
+# RoadRunner - specific
+rr.yaml
+.rr.yaml
+.rr.cache
+
+# Octane - specific
+bootstrap/cache/octane-*.php
+
+#Swoole - specific
+storage/swoole.log
+

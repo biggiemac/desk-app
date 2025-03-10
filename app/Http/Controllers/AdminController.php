@@ -4,35 +4,27 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Reservation;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class AdminController extends Controller
 {
-    public function __construct()
-    {
-        // Remove the old middleware syntax
-    }
-
     public function dashboard()
     {
-        $totalReservations = Reservation::count();
-        $activeUsers = User::where('is_active', true)->count();
-        $weeklyBookings = Reservation::whereBetween('date', [
-            Carbon::now()->startOfWeek(),
-            Carbon::now()->endOfWeek()
-        ])->count();
+        $totalUsers = User::count();
+        $totalReservations = Reservation::where('status', 'confirmed')->count();
+        $todayReservations = Reservation::where('date', today())
+            ->where('status', 'confirmed')
+            ->count();
 
-        return view('admin.dashboard', compact(
-            'totalReservations',
-            'activeUsers',
-            'weeklyBookings'
-        ));
+        return view('admin.dashboard', compact('totalUsers', 'totalReservations', 'todayReservations'));
     }
 
     public function users()
     {
-        $users = User::paginate(10);
+        $users = User::withCount(['reservations' => function($query) {
+            $query->where('status', 'confirmed');
+        }])->paginate(10);
+
         return view('admin.users', compact('users'));
     }
 
@@ -40,7 +32,8 @@ class AdminController extends Controller
     {
         $reservations = Reservation::with('user')
             ->orderBy('date', 'desc')
-            ->paginate(10);
+            ->paginate(15);
+
         return view('admin.reservations', compact('reservations'));
     }
 

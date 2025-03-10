@@ -4,16 +4,15 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class AdminMiddleware
 {
     public function handle(Request $request, Closure $next)
     {
-        if (Auth::check() && Auth::user()->is_admin) {
-            return $next($request);
+        if (!auth()->check() || !auth()->user()->is_admin) {
+            abort(403, 'Unauthorized action.');
         }
 
-        return redirect()->route('home')->with('error', 'Unauthorized access.');
+        return $next($request);
     }
 }

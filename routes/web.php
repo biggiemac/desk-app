@@ -26,11 +26,11 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
-    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
-    Route::get('/users', [AdminController::class, 'users'])->name('admin.users');
-    Route::get('/reservations', [AdminController::class, 'reservations'])->name('admin.reservations');
-    Route::delete('/reservations/{reservation}', [AdminController::class, 'cancelReservation'])->name('admin.reservations.cancel');
-    Route::patch('/users/{user}/toggle-admin', [AdminController::class, 'toggleAdmin'])->name('admin.users.toggle-admin');
+    Route::get('/dashboard', [App\Http\Controllers\AdminController::class, 'dashboard'])->name('admin.dashboard');
+    Route::get('/users', [App\Http\Controllers\AdminController::class, 'users'])->name('admin.users');
+    Route::get('/reservations', [App\Http\Controllers\AdminController::class, 'reservations'])->name('admin.reservations');
+    Route::delete('/reservations/{reservation}', [App\Http\Controllers\AdminController::class, 'cancelReservation'])->name('admin.reservations.cancel');
+    Route::patch('/users/{user}/toggle-admin', [App\Http\Controllers\AdminController::class, 'toggleAdmin'])->name('admin.users.toggle-admin');
     Route::get('/holidays', [CustomHolidayController::class, 'index'])->name('admin.holidays.index');
     Route::post('/holidays', [CustomHolidayController::class, 'store'])->name('admin.holidays.store');
     Route::delete('/holidays/{holiday}', [CustomHolidayController::class, 'destroy'])->name('admin.holidays.destroy');

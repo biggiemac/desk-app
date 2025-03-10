@@ -9,13 +9,11 @@ class CustomHoliday extends Model
 {
     protected $fillable = [
         'name',
-        'date',
-        'description',
-        'created_by'
+        'date'
     ];
 
     protected $casts = [
-        'date' => 'date',
+        'date' => 'date'
     ];
 
     public function creator(): BelongsTo

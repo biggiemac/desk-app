@@ -10,36 +10,34 @@ use App\Models\CustomHoliday;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        // Get the week offset from the query string (default to 0 for current week)
-        $weekOffset = (int) $request->query('week', 0);
+        $weekOffset = (int) request('week', 0);
         
-        // Calculate start and end dates for the requested week
-        $startOfWeek = Carbon::now()->startOfWeek()->addWeeks($weekOffset);
-        $endOfWeek = Carbon::now()->endOfWeek()->addWeeks($weekOffset);
+        $startDate = Carbon::now()
+            ->addWeeks($weekOffset)
+            ->startOfWeek();
         
-        // Get upcoming reservations for the user
-        $upcomingReservations = $request->user()
-            ->reservations()
-            ->where('date', '>=', now())
+        $endDate = $startDate->copy()->endOfWeek();
+
+        $reservations = Reservation::whereBetween('date', [$startDate, $endDate])
+            ->where('status', 'confirmed')
+            ->get();
+
+        $upcomingReservations = Reservation::where('user_id', auth()->id())
+            ->where('date', '>=', now()->startOfDay())
             ->where('status', 'confirmed')
             ->orderBy('date')
             ->get();
 
-        // Get all confirmed reservations for the week
-        $reservations = Reservation::whereBetween('date', [$startOfWeek, $endOfWeek])
-            ->where('status', 'confirmed')
-            ->get();
-
-        $availableSlots = $this->generateWeeklySlots($startOfWeek, $reservations);
+        $slots = $this->generateWeeklySlots($startDate, $reservations);
 
         return view('dashboard', [
+            'slots' => $slots,
             'upcomingReservations' => $upcomingReservations,
-            'slots' => $availableSlots,
             'weekOffset' => $weekOffset,
-            'startOfWeek' => $startOfWeek,
-            'endOfWeek' => $endOfWeek,
+            'startOfWeek' => $startDate,
+            'endOfWeek' => $endDate
         ]);
     }
 
@@ -60,6 +58,12 @@ class DashboardController extends Controller
         
         for ($i = 0; $i < 5; $i++) {
             $currentDate = $startDate->copy()->addDays($i);
+            
+            // Skip weekend days
+            if ($currentDate->isWeekend()) {
+                continue;
+            }
+
             $isToday = $currentDate->isToday();
             $isPastDate = $currentDate->isBefore($now->startOfDay());
             
@@ -75,9 +79,11 @@ class DashboardController extends Controller
                 if ($customHoliday) {
                     $holidayName = $customHoliday->name;
                 } else {
-                    $holidayName = $holidays->isHoliday($currentDate) 
-                        ? $holidays->holiday($currentDate)->getName() 
-                        : $nextYearHolidays->holiday($currentDate)->getName();
+                    if ($holidays->isHoliday($currentDate)) {
+                        $holidayName = $holidays->holiday($currentDate)->getName();
+                    } elseif ($nextYearHolidays->isHoliday($currentDate)) {
+                        $holidayName = $nextYearHolidays->holiday($currentDate)->getName();
+                    }
                 }
             }
             
@@ -85,26 +91,15 @@ class DashboardController extends Controller
             $amCutoff = $currentDate->copy()->setHour(12)->setMinute(0);
             $pmCutoff = $currentDate->copy()->setHour(17)->setMinute(0);
             
-            // Check if slots are past their cutoff
             $isAMPassed = $isToday && $now->greaterThanOrEqualTo($amCutoff);
             $isPMPassed = $isToday && $now->greaterThanOrEqualTo($pmCutoff);
             
-            // Get confirmed reservations for this date
-            $confirmedAM = $reservations->filter(function($reservation) use ($currentDate) {
-                return $reservation->date->format('Y-m-d') === $currentDate->format('Y-m-d') 
-                    && $reservation->time_slot === 'AM' 
-                    && $reservation->status === 'confirmed';
-            })->isNotEmpty();
-                
-            $confirmedPM = $reservations->filter(function($reservation) use ($currentDate) {
-                return $reservation->date->format('Y-m-d') === $currentDate->format('Y-m-d') 
-                    && $reservation->time_slot === 'PM' 
-                    && $reservation->status === 'confirmed';
-            })->isNotEmpty();
+            $dateKey = $currentDate->format('Y-m-d');
             
-            $slots[$currentDate->format('Y-m-d')] = [
-                'AM' => !$isPastDate && !$isAMPassed && !$confirmedAM && !$isHoliday,
-                'PM' => !$isPastDate && !$isPMPassed && !$confirmedPM && !$isHoliday,
+            $slots[$dateKey] = [
+                'AM' => !$isPastDate && !$isAMPassed && !$this->isSlotBooked($reservations, $dateKey, 'AM') && !$isHoliday,
+                'PM' => !$isPastDate && !$isPMPassed && !$this->isSlotBooked($reservations, $dateKey, 'PM') && !$isHoliday,
+                'date' => $currentDate,
                 'isPast' => $isPastDate,
                 'isAMPassed' => $isAMPassed,
                 'isPMPassed' => $isPMPassed,
@@ -112,6 +107,16 @@ class DashboardController extends Controller
                 'holidayName' => $holidayName
             ];
         }
+        
         return $slots;
+    }
+
+    private function isSlotBooked($reservations, $date, $timeSlot)
+    {
+        return $reservations->contains(function ($reservation) use ($date, $timeSlot) {
+            return $reservation->date->format('Y-m-d') === $date 
+                && $reservation->time_slot === $timeSlot
+                && $reservation->status === 'confirmed';
+        });
     }
 }

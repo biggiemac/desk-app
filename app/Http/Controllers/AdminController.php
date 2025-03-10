@@ -4,26 +4,38 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Reservation;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class AdminController extends Controller
 {
     public function dashboard()
     {
-        $totalUsers = User::count();
         $totalReservations = Reservation::where('status', 'confirmed')->count();
-        $todayReservations = Reservation::where('date', today())
-            ->where('status', 'confirmed')
-            ->count();
+        $activeUsers = User::count();
+        $weeklyBookings = Reservation::where('status', 'confirmed')
+            ->whereBetween('date', [
+                Carbon::now()->startOfWeek(),
+                Carbon::now()->endOfWeek()
+            ])->count();
 
-        return view('admin.dashboard', compact('totalUsers', 'totalReservations', 'todayReservations'));
+        $recentReservations = Reservation::with('user')
+            ->orderBy('created_at', 'desc')
+            ->take(5)
+            ->get();
+
+        return view('admin.dashboard', compact(
+            'totalReservations',
+            'activeUsers',
+            'weeklyBookings',
+            'recentReservations'
+        ));
     }
 
     public function users()
     {
-        $users = User::withCount(['reservations' => function($query) {
-            $query->where('status', 'confirmed');
-        }])->paginate(10);
+        $users = User::orderBy('name')
+            ->paginate(10);
 
         return view('admin.users', compact('users'));
     }
@@ -32,7 +44,7 @@ class AdminController extends Controller
     {
         $reservations = Reservation::with('user')
             ->orderBy('date', 'desc')
-            ->paginate(15);
+            ->paginate(10);
 
         return view('admin.reservations', compact('reservations'));
     }
@@ -40,7 +52,6 @@ class AdminController extends Controller
     public function cancelReservation(Reservation $reservation)
     {
         $reservation->update(['status' => 'cancelled']);
-
         return back()->with('success', 'Reservation cancelled successfully.');
     }
 

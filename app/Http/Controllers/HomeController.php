@@ -4,35 +4,27 @@ namespace App\Http\Controllers;
 
 use App\Models\Reservation;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 
 class HomeController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $startOfWeek = Carbon::now()->startOfWeek();
-        $endOfWeek = Carbon::now()->endOfWeek();
+        $weekOffset = (int) $request->query('week', 0);
         
-        $reservations = Reservation::whereBetween('date', [$startOfWeek, $endOfWeek])
+        $startDate = Carbon::now()
+            ->addWeeks($weekOffset)
+            ->startOfWeek();
+        
+        $endDate = $startDate->copy()->endOfWeek();
+
+        $reservations = Reservation::whereBetween('date', [$startDate, $endDate])
             ->where('status', 'confirmed')
             ->get();
 
-        // Add debugging
-        \Log::info('Home Controller Reservations:', [
-            'count' => $reservations->count(),
-            'data' => $reservations->toArray()
-        ]);
+        $availableSlots = $this->generateWeeklySlots($startDate, $reservations);
 
-        $availableSlots = $this->generateWeeklySlots($startOfWeek, $reservations);
-
-        // Add debugging
-        \Log::info('Generated Slots:', [
-            'slots' => $availableSlots
-        ]);
-
-        return view('home', [
-            'startDate' => $startOfWeek,
-            'slots' => $availableSlots,
-        ]);
+        return view('home', compact('availableSlots'));
     }
 
     private function generateWeeklySlots($startDate, $reservations)
@@ -42,6 +34,12 @@ class HomeController extends Controller
         
         for ($i = 0; $i < 5; $i++) {
             $currentDate = $startDate->copy()->addDays($i);
+            
+            // Skip weekend days
+            if ($currentDate->isWeekend()) {
+                continue;
+            }
+
             $isToday = $currentDate->isToday();
             $isPastDate = $currentDate->isBefore($now->startOfDay());
             
@@ -49,31 +47,25 @@ class HomeController extends Controller
             $amCutoff = $currentDate->copy()->setHour(12)->setMinute(0);
             $pmCutoff = $currentDate->copy()->setHour(17)->setMinute(0);
             
-            // Check if slots are past their cutoff
             $isAMPassed = $isToday && $now->greaterThanOrEqualTo($amCutoff);
             $isPMPassed = $isToday && $now->greaterThanOrEqualTo($pmCutoff);
             
-            // Get confirmed reservations for this date
-            $confirmedAM = $reservations->filter(function($reservation) use ($currentDate) {
-                return $reservation->date->format('Y-m-d') === $currentDate->format('Y-m-d') 
-                    && $reservation->time_slot === 'AM' 
-                    && $reservation->status === 'confirmed';
-            })->isNotEmpty();
-                
-            $confirmedPM = $reservations->filter(function($reservation) use ($currentDate) {
-                return $reservation->date->format('Y-m-d') === $currentDate->format('Y-m-d') 
-                    && $reservation->time_slot === 'PM' 
-                    && $reservation->status === 'confirmed';
-            })->isNotEmpty();
+            $dateKey = $currentDate->format('Y-m-d');
             
-            $slots[$currentDate->format('Y-m-d')] = [
-                'AM' => !$isPastDate && !$isAMPassed && !$confirmedAM,
-                'PM' => !$isPastDate && !$isPMPassed && !$confirmedPM,
-                'isPast' => $isPastDate,
-                'isAMPassed' => $isAMPassed,
-                'isPMPassed' => $isPMPassed
+            $slots[$dateKey] = [
+                'AM' => !$isPastDate && !$isAMPassed && !$this->isSlotBooked($reservations, $dateKey, 'AM'),
+                'PM' => !$isPastDate && !$isPMPassed && !$this->isSlotBooked($reservations, $dateKey, 'PM')
             ];
         }
+        
         return $slots;
+    }
+
+    private function isSlotBooked($reservations, $date, $timeSlot)
+    {
+        return $reservations->contains(function ($reservation) use ($date, $timeSlot) {
+            return $reservation->date->format('Y-m-d') === $date 
+                && $reservation->time_slot === $timeSlot;
+        });
     }
 }
